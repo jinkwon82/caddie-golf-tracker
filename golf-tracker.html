@@ -55,6 +55,13 @@
   .fab-secondary { background:var(--panel); border:1px solid var(--border); color:var(--white); }
   .fab-flag { background:var(--flag); color:white; }
 
+  /* 확대/축소 버튼 */
+  .zoom-group { position:absolute; left:16px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:0; z-index:30; box-shadow:0 4px 16px rgba(0,0,0,0.4); border-radius:10px; overflow:hidden; }
+  .zoom-btn { width:40px; height:40px; background:var(--panel); border:none; border-bottom:1px solid var(--border); color:var(--white); font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; backdrop-filter:blur(6px); font-weight:300; line-height:1; }
+  .zoom-btn:last-child { border-bottom:none; }
+  .zoom-btn:hover { background:var(--green); color:white; }
+  .zoom-btn:active { transform:scale(0.92); }
+
   .gps-badge { position:absolute; left:12px; bottom:20px; background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:6px 12px; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); z-index:20; display:flex; align-items:center; gap:6px; backdrop-filter:blur(6px); }
   .gps-dot { width:6px; height:6px; background:#4ade80; border-radius:50%; animation:pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
@@ -165,6 +172,13 @@
     <button class="search-btn" onclick="searchPlace()">🔍 이동</button>
   </div>
   <div class="pin-mode-badge" id="pinModeBadge">📍 핀 위치를 지도에서 클릭하세요</div>
+
+  <!-- 확대/축소 버튼 -->
+  <div class="zoom-group">
+    <button class="zoom-btn" onclick="zoomIn()" title="확대">+</button>
+    <button class="zoom-btn" onclick="zoomOut()" title="축소">−</button>
+  </div>
+
   <div class="gps-badge">
     <div class="gps-dot"></div>
     <span id="gpsText">GPS 확인중</span>
@@ -347,6 +361,10 @@ function initMap() {
     }, () => { document.getElementById('gpsText').textContent = 'GPS 없음'; });
   }
 }
+
+// 카카오 지도에서 level은 숫자가 작을수록 확대, 클수록 축소 (1~14)
+function zoomIn()  { kMap.setLevel(kMap.getLevel() - 1, {animate: true}); }
+function zoomOut() { kMap.setLevel(kMap.getLevel() + 1, {animate: true}); }
 
 function toggleSatellite() {
   state.isSatellite = !state.isSatellite;

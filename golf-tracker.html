@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CADDIE — 골프 라운드 트래커</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- config.js 를 먼저 로드한 후 카카오 SDK 로드 -->
+<script src="config.js"></script>
+<style>
+  :root {
+    --fairway: #1a3a2a;
+    --rough: #0d2318;
+    --green: #2d6a4f;
+    --flag: #e63946;
+    --sky: #a8dadc;
+    --white: #f1faee;
+    --muted: #6b8f71;
+    --panel: rgba(10, 20, 15, 0.92);
+    --border: rgba(45, 106, 79, 0.4);
+    --gold: #c9a84c;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--rough); font-family:'Noto Sans KR',sans-serif; color:var(--white); height:100dvh; overflow:hidden; display:flex; flex-direction:column; }
+
+  header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; background:var(--rough); border-bottom:1px solid var(--border); z-index:100; flex-shrink:0; }
+  .logo { font-family:'DM Serif Display',serif; font-size:22px; letter-spacing:4px; color:var(--gold); }
+  .hole-nav { display:flex; align-items:center; gap:12px; }
+  .hole-nav button { background:none; border:1px solid var(--border); color:var(--white); width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .hole-nav button:hover { background:var(--green); border-color:var(--green); }
+  .hole-info { text-align:center; line-height:1.2; }
+  .hole-info .hole-num { font-family:'DM Serif Display',serif; font-size:20px; color:var(--gold); }
+  .hole-info .hole-par { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:1px; }
+  .header-actions { display:flex; gap:8px; }
+  .btn-icon { background:none; border:1px solid var(--border); color:var(--white); width:36px; height:36px; border-radius:8px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .btn-icon:hover { background:var(--green); }
+  .btn-icon.active { background:var(--flag); border-color:var(--flag); }
+
+  #map-container { flex:1; position:relative; overflow:hidden; }
+  #map { width:100%; height:100%; }
+
+  .search-bar { position:absolute; top:12px; left:12px; z-index:20; display:flex; gap:6px; }
+  .search-input { background:var(--panel); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:7px 12px; font-size:12px; font-family:'Noto Sans KR',sans-serif; outline:none; width:170px; backdrop-filter:blur(8px); }
+  .search-input:focus { border-color:var(--green); }
+  .search-btn { background:var(--green); border:none; border-radius:8px; color:white; padding:7px 11px; font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; white-space:nowrap; }
+
+  .pin-mode-badge { position:absolute; top:12px; left:50%; transform:translateX(-50%); background:rgba(230,57,70,0.15); border:1px solid var(--flag); color:var(--flag); padding:6px 14px; border-radius:20px; font-size:11px; font-family:'DM Mono',monospace; white-space:nowrap; z-index:20; display:none; }
+  .pin-mode-badge.visible { display:block; }
+
+  .fab-group { position:absolute; right:16px; bottom:20px; display:flex; flex-direction:column; gap:10px; z-index:30; }
+  .fab { width:48px; height:48px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:0 4px 16px rgba(0,0,0,0.4); transition:all 0.2s; }
+  .fab:active { transform:scale(0.92); }
+  .fab-primary { background:var(--green); color:white; }
+  .fab-secondary { background:var(--panel); border:1px solid var(--border); color:var(--white); }
+  .fab-flag { background:var(--flag); color:white; }
+
+  .gps-badge { position:absolute; left:12px; bottom:20px; background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:6px 12px; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); z-index:20; display:flex; align-items:center; gap:6px; backdrop-filter:blur(6px); }
+  .gps-dot { width:6px; height:6px; background:#4ade80; border-radius:50%; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+  .kakao-shot-marker { width:32px; height:32px; border-radius:50%; border:2.5px solid white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; font-family:'DM Mono',monospace; color:white; box-shadow:0 2px 10px rgba(0,0,0,0.7); cursor:pointer; position:relative; transition:transform 0.15s; }
+  .kakao-shot-marker:hover { transform:scale(1.15); }
+  .kakao-shot-marker .club-label { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:9px; color:white; white-space:nowrap; background:rgba(0,0,0,0.75); padding:1px 5px; border-radius:3px; pointer-events:none; }
+
+  .shot-info-popup { background:#0d2318; border:1px solid rgba(45,106,79,0.5); border-radius:12px; padding:13px 15px; min-width:165px; box-shadow:0 8px 28px rgba(0,0,0,0.65); color:#f1faee; font-family:'Noto Sans KR',sans-serif; position:relative; margin-bottom:12px; }
+  .shot-info-popup::after { content:''; position:absolute; bottom:-7px; left:50%; transform:translateX(-50%) rotate(45deg); width:12px; height:12px; background:#0d2318; border-right:1px solid rgba(45,106,79,0.4); border-bottom:1px solid rgba(45,106,79,0.4); }
+  .sip-club { font-family:'DM Serif Display',serif; font-size:17px; color:#c9a84c; margin-bottom:3px; }
+  .sip-dist { font-family:'DM Mono',monospace; font-size:11px; color:#a8dadc; margin-bottom:6px; }
+  .sip-note { font-size:11px; color:#6b8f71; border-top:1px solid rgba(45,106,79,0.3); padding-top:7px; margin-top:4px; }
+  .sip-num { font-family:'DM Mono',monospace; font-size:9px; color:#6b8f71; margin-top:5px; }
+  .sip-actions { display:flex; gap:6px; margin-top:9px; }
+  .sip-btn { flex:1; padding:6px; border-radius:7px; border:1px solid rgba(45,106,79,0.4); background:none; color:#f1faee; font-size:11px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .sip-btn.del { border-color:rgba(230,57,70,0.4); color:#e63946; }
+  .sip-btn:hover { background:rgba(255,255,255,0.08); }
+
+  #scorecard { background:var(--panel); border-top:1px solid var(--border); padding:12px 16px 16px; flex-shrink:0; backdrop-filter:blur(10px); }
+  .scorecard-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .scorecard-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; }
+  .total-score { display:flex; align-items:center; gap:8px; }
+  .total-score .label { font-size:11px; color:var(--muted); }
+  .total-score .value { font-family:'DM Serif Display',serif; font-size:22px; color:var(--gold); }
+  .vs-par { font-family:'DM Mono',monospace; font-size:12px; padding:2px 6px; border-radius:4px; }
+  .vs-par.over { background:rgba(230,57,70,0.2); color:var(--flag); }
+  .vs-par.under { background:rgba(74,222,128,0.15); color:#4ade80; }
+  .vs-par.even { background:rgba(248,248,248,0.1); color:var(--white); }
+  .holes-row { display:grid; grid-template-columns:repeat(9,1fr); gap:4px; margin-bottom:6px; }
+  .hole-cell { text-align:center; background:rgba(255,255,255,0.04); border-radius:6px; padding:4px 2px; cursor:pointer; transition:all 0.2s; border:1px solid transparent; }
+  .hole-cell.active { background:rgba(45,106,79,0.3); border-color:var(--green); }
+  .hole-cell:hover { background:rgba(255,255,255,0.08); }
+  .hc-num { font-family:'DM Mono',monospace; font-size:9px; color:var(--muted); }
+  .hc-par { font-size:9px; color:var(--muted); margin:1px 0; }
+  .hc-score { font-family:'DM Serif Display',serif; font-size:16px; color:var(--white); line-height:1.1; min-height:19px; }
+  .hc-score.eagle { color:#4ade80; text-shadow:0 0 8px rgba(74,222,128,0.5); }
+  .hc-score.birdie { color:#86efac; }
+  .hc-score.par { color:var(--white); }
+  .hc-score.bogey { color:#fbbf24; }
+  .hc-score.double { color:var(--flag); }
+  .hc-score.triple-plus { color:#f87171; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; display:flex; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px); opacity:0; pointer-events:none; transition:opacity 0.3s; }
+  .modal-overlay.open { opacity:1; pointer-events:all; }
+  .modal-sheet { background:var(--rough); border:1px solid var(--border); border-radius:20px 20px 0 0; width:100%; max-width:480px; padding:20px; transform:translateY(100%); transition:transform 0.35s cubic-bezier(0.16,1,0.3,1); }
+  .modal-overlay.open .modal-sheet { transform:translateY(0); }
+  .modal-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+  .modal-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--gold); margin-bottom:4px; }
+  .modal-subtitle { font-size:12px; color:var(--muted); margin-bottom:20px; }
+  .club-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+  .club-btn { padding:10px 4px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--white); font-family:'DM Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.15s; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .club-btn .club-emoji { font-size:16px; }
+  .club-btn:hover, .club-btn.selected { background:var(--green); border-color:var(--green); color:white; }
+  .modal-row { display:flex; gap:10px; margin-bottom:14px; align-items:center; }
+  .modal-row label { font-size:12px; color:var(--muted); width:80px; flex-shrink:0; }
+  .modal-input { flex:1; background:rgba(255,255,255,0.07); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:8px 12px; font-size:14px; font-family:'Noto Sans KR',sans-serif; outline:none; }
+  .modal-input:focus { border-color:var(--green); }
+  .dist-display { flex:1; background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.2); border-radius:8px; color:#4ade80; padding:8px 12px; font-family:'DM Mono',monospace; font-size:14px; font-weight:500; }
+  .modal-actions { display:flex; gap:10px; margin-top:6px; }
+  .btn-primary { flex:1; background:var(--green); border:none; border-radius:12px; color:white; padding:14px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Noto Sans KR',sans-serif; transition:background 0.2s; }
+  .btn-primary:hover { background:#3a8a63; }
+  .btn-cancel { padding:14px 20px; background:none; border:1px solid var(--border); border-radius:12px; color:var(--muted); cursor:pointer; font-size:14px; font-family:'Noto Sans KR',sans-serif; transition:all 0.2s; }
+  .btn-cancel:hover { border-color:var(--flag); color:var(--flag); }
+  .par-options { display:flex; gap:12px; margin-bottom:20px; }
+  .par-opt { flex:1; padding:16px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; text-align:center; cursor:pointer; transition:all 0.2s; }
+  .par-opt:hover,.par-opt.selected { background:var(--green); border-color:var(--green); }
+  .par-opt .par-num { font-family:'DM Serif Display',serif; font-size:28px; color:var(--gold); display:block; }
+  .par-opt .par-label { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; display:block; margin-top:2px; }
+  .score-input-row { display:flex; align-items:center; justify-content:center; gap:20px; margin-bottom:20px; }
+  .score-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--white); font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .score-btn:hover { background:var(--fairway); }
+  .score-num { font-family:'DM Serif Display',serif; font-size:52px; color:var(--gold); min-width:60px; text-align:center; line-height:1; }
+  .score-vs-par { font-family:'DM Mono',monospace; font-size:13px; text-align:center; margin-bottom:6px; }
+  .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--green); color:white; padding:8px 18px; border-radius:20px; font-size:13px; z-index:300; opacity:0; transition:all 0.3s; pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* API 키 오류 안내 */
+  .api-error { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--rough); z-index:50; }
+  .api-error h2 { font-family:'DM Serif Display',serif; color:var(--gold); font-size:22px; }
+  .api-error p { color:var(--muted); font-size:13px; text-align:center; line-height:1.7; }
+  .api-error code { background:rgba(255,255,255,0.08); padding:3px 8px; border-radius:4px; font-family:'DM Mono',monospace; color:var(--sky); font-size:12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">CADDIE</div>
+  <div class="hole-nav">
+    <button onclick="changeHole(-1)">‹</button>
+    <div class="hole-info">
+      <div class="hole-num" id="holeNum">홀 1</div>
+      <div class="hole-par" id="holePar">PAR 4 · 380Y</div>
+    </div>
+    <button onclick="changeHole(1)">›</button>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="openParModal()" title="파/거리 설정">⛳</button>
+    <button class="btn-icon" onclick="openScoreModal()" title="스코어 입력">📝</button>
+    <button class="btn-icon active" id="btnSat" onclick="toggleSatellite()" title="지도 모드 전환">🛰</button>
+  </div>
+</header>
+
+<div id="map-container">
+  <div id="map"></div>
+  <div class="search-bar">
+    <input class="search-input" id="searchInput" placeholder="골프장 이름 검색..." onkeydown="if(event.key==='Enter')searchPlace()" />
+    <button class="search-btn" onclick="searchPlace()">🔍 이동</button>
+  </div>
+  <div class="pin-mode-badge" id="pinModeBadge">📍 핀 위치를 지도에서 클릭하세요</div>
+  <div class="gps-badge">
+    <div class="gps-dot"></div>
+    <span id="gpsText">GPS 확인중</span>
+  </div>
+  <div class="fab-group">
+    <button class="fab fab-flag" id="fabPin" onclick="togglePinMode()" title="핀 위치 설정">📍</button>
+    <button class="fab fab-primary" onclick="useGPS()" title="현재 위치에서 샷 기록">🎯</button>
+    <button class="fab fab-secondary" onclick="undoLastShot()" title="마지막 샷 취소">↩</button>
+  </div>
+</div>
+
+<div id="scorecard">
+  <div class="scorecard-header">
+    <div class="scorecard-title">SCORECARD</div>
+    <div class="total-score">
+      <span class="label">합계</span>
+      <span class="value" id="totalScore">—</span>
+      <span class="vs-par even" id="vsParBadge">E</span>
+    </div>
+  </div>
+  <div class="holes-row" id="holesRow"></div>
+  <div class="holes-row" id="holesRow2"></div>
+</div>
+
+<!-- SHOT MODAL -->
+<div class="modal-overlay" id="shotModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">샷 기록</div>
+    <div class="modal-subtitle" id="shotModalSubtitle">홀 1 · 1번째 샷</div>
+    <div class="club-grid" id="clubGrid"></div>
+    <div class="modal-row">
+      <label>핀까지 거리</label>
+      <div class="dist-display" id="distToPin">— Y</div>
+    </div>
+    <div class="modal-row">
+      <label>메모</label>
+      <input class="modal-input" id="shotNote" placeholder="훅, 뒤땅, 멀리건..." />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('shotModal')">취소</button>
+      <button class="btn-primary" onclick="saveShot()">기록 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAR MODAL -->
+<div class="modal-overlay" id="parModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">홀 설정</div>
+    <div class="modal-subtitle" id="parModalSubtitle">홀 1 파 및 거리</div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">파 (Par)</div>
+      <div class="par-options">
+        <div class="par-opt" onclick="selectPar(3,this)"><span class="par-num">3</span><span class="par-label">PAR 3</span></div>
+        <div class="par-opt selected" onclick="selectPar(4,this)"><span class="par-num">4</span><span class="par-label">PAR 4</span></div>
+        <div class="par-opt" onclick="selectPar(5,this)"><span class="par-num">5</span><span class="par-label">PAR 5</span></div>
+      </div>
+    </div>
+    <div class="modal-row">
+      <label>거리 (야드)</label>
+      <input class="modal-input" id="holeDistance" type="number" placeholder="예: 380" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('parModal')">취소</button>
+      <button class="btn-primary" onclick="savePar()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCORE MODAL -->
+<div class="modal-overlay" id="scoreModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">스코어 입력</div>
+    <div class="modal-subtitle" id="scoreModalSubtitle">홀 1 · Par 4</div>
+    <div class="score-input-row">
+      <button class="score-btn" onclick="adjustScore(-1)">−</button>
+      <div class="score-num" id="scoreDisplay">4</div>
+      <button class="score-btn" onclick="adjustScore(1)">+</button>
+    </div>
+    <div class="score-vs-par" id="scoreVsPar">파</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('scoreModal')">취소</button>
+      <button class="btn-primary" onclick="saveScore()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG 확인 ──
+if (typeof CONFIG === 'undefined' || !CONFIG.KAKAO_API_KEY || CONFIG.KAKAO_API_KEY === '여기에_카카오_JavaScript_키_입력') {
+  document.getElementById('map').innerHTML = `
+    <div class="api-error">
+      <h2>⚠ API 키 설정 필요</h2>
+      <p>프로젝트 폴더에 <code>config.js</code> 파일이 없거나 키가 설정되지 않았습니다.<br>
+      <code>config.example.js</code> 파일을 복사해서 <code>config.js</code>로 저장하고<br>
+      카카오 JavaScript 키를 입력해 주세요.</p>
+    </div>`;
+  throw new Error('CONFIG not found. Please create config.js from config.example.js');
+}
+
+// ── 카카오 SDK 동적 로드 ──
+(function loadKakaoSDK() {
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_API_KEY}&libraries=services&autoload=false`;
+  script.onload = function() {
+    kakao.maps.load(function() {
+      initApp();
+    });
+  };
+  document.head.appendChild(script);
+})();
+
+// ── CLUBS ──
+const CLUBS = [
+  {id:'D',  label:'드라이버',  emoji:'🏌'},{id:'3W', label:'3번 우드', emoji:'🌳'},
+  {id:'5W', label:'5번 우드',  emoji:'🌿'},{id:'3H', label:'하이브리드',emoji:'🔱'},
+  {id:'4I', label:'4번 아이언',emoji:'⚙'},{id:'5I', label:'5번 아이언',emoji:'⚙'},
+  {id:'6I', label:'6번 아이언',emoji:'⚙'},{id:'7I', label:'7번 아이언',emoji:'⚙'},
+  {id:'8I', label:'8번 아이언',emoji:'⚙'},{id:'9I', label:'9번 아이언',emoji:'⚙'},
+  {id:'PW', label:'피칭 웨지', emoji:'🌙'},{id:'GW', label:'갭 웨지',   emoji:'🌙'},
+  {id:'SW', label:'샌드 웨지', emoji:'🏖'},{id:'LW', label:'로브 웨지', emoji:'🌙'},
+  {id:'P',  label:'퍼터',      emoji:'🏳'},{id:'OT', label:'기타',       emoji:'❓'},
+];
+const CLUB_COLORS = {
+  D:'#e63946','3W':'#457b9d','5W':'#2a9d8f','3H':'#6a4c93',
+  '4I':'#1d7a4f','5I':'#2d8f5a','6I':'#3a9e67','7I':'#48ad75','8I':'#56bc82','9I':'#65ca8f',
+  PW:'#e9c46a',GW:'#f4a261',SW:'#e76f51',LW:'#d62828',P:'#a8dadc',OT:'#6c757d',
+};
+
+// ── STATE ──
+const state = {
+  currentHole: 1,
+  holes: Array.from({length:18},(_,i)=>({num:i+1,par:4,distance:380,score:null,shots:[],pin:null})),
+  selectedClub: 'D',
+  pinMode: false,
+  tempLatLng: null,
+  tempScore: 4,
+  isSatellite: true,
+  _tempPar: 4,
+};
+
+let kMap, kGeocoder;
+let shotOverlays=[], pinOverlay=null, shotLines=[], distOverlays=[], infoOverlay=null;
+
+// ── INIT ──
+function initApp() {
+  buildClubGrid();
+  buildScorecard();
+  updateHoleDisplay();
+  initMap();
+}
+
+function initMap() {
+  kMap = new kakao.maps.Map(document.getElementById('map'), {
+    center: new kakao.maps.LatLng(37.3219, 127.1086),
+    level: 4,
+    mapTypeId: kakao.maps.MapTypeId.HYBRID,
+  });
+  kGeocoder = new kakao.maps.services.Geocoder();
+
+  kakao.maps.event.addListener(kMap, 'click', function(me) {
+    closeInfoOverlay();
+    const ll = me.latLng;
+    if (state.pinMode) { setPinLatLng(ll); return; }
+    state.tempLatLng = ll;
+    openShotModal(ll);
+  });
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      kMap.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      document.getElementById('gpsText').textContent = 'GPS 활성';
+      showToast('📍 현재 위치로 이동했습니다');
+    }, () => { document.getElementById('gpsText').textContent = 'GPS 없음'; });
+  }
+}
+
+function toggleSatellite() {
+  state.isSatellite = !state.isSatellite;
+  kMap.setMapTypeId(state.isSatellite ? kakao.maps.MapTypeId.HYBRID : kakao.maps.MapTypeId.ROADMAP);
+  document.getElementById('btnSat').classList.toggle('active', state.isSatellite);
+  showToast(state.isSatellite ? '🛰 위성지도 모드' : '🗺 일반지도 모드');
+}
+
+function searchPlace() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  const ps = new kakao.maps.services.Places();
+  ps.keywordSearch(q, (data, status) => {
+    if (status === kakao.maps.services.Status.OK) {
+      kMap.setCenter(new kakao.maps.LatLng(data[0].y, data[0].x));
+      kMap.setLevel(3);
+      showToast(`⛳ ${data[0].place_name}으로 이동`);
+    } else {
+      showToast('검색 결과가 없습니다', 'error');
+    }
+  });
+}
+
+function togglePinMode() {
+  state.pinMode = !state.pinMode;
+  document.getElementById('pinModeBadge').classList.toggle('visible', state.pinMode);
+  document.getElementById('fabPin').style.background = state.pinMode ? '#f4d35e' : '#e63946';
+  if (state.pinMode) showToast('핀 위치를 지도에서 클릭하세요');
+}
+
+function setPinLatLng(ll) {
+  currentHole().pin = ll;
+  state.pinMode = false;
+  document.getElementById('pinModeBadge').classList.remove('visible');
+  document.getElementById('fabPin').style.background = '#e63946';
+  renderOverlays();
+  showToast('🚩 핀 위치 저장됨');
+}
+
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371e3, r=x=>x*Math.PI/180;
+  const a=Math.sin(r(lat2-lat1)/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(r(lng2-lng1)/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))*1.09361);
+}
+function distToPin(ll) {
+  const pin = currentHole().pin;
+  if (!pin) return null;
+  return haversine(ll.getLat(),ll.getLng(),pin.getLat(),pin.getLng());
+}
+
+function openShotModal(ll) {
+  const h = currentHole();
+  document.getElementById('shotModalSubtitle').textContent = `홀 ${h.num} · ${h.shots.length+1}번째 샷`;
+  const d = distToPin(ll);
+  document.getElementById('distToPin').textContent = d!==null ? `${d} Y` : '— Y  (핀을 먼저 설정하세요)';
+  document.getElementById('shotNote').value = '';
+  openModal('shotModal');
+}
+
+function saveShot() {
+  if (!state.tempLatLng) return;
+  const h = currentHole();
+  h.shots.push({id:Date.now(),club:state.selectedClub,latlng:state.tempLatLng,distToPin:distToPin(state.tempLatLng),note:document.getElementById('shotNote').value,num:h.shots.length+1});
+  closeModal('shotModal');
+  state.tempLatLng = null;
+  renderOverlays();
+  buildScorecard();
+  showToast(`⛳ ${state.selectedClub} 샷 기록 완료`);
+}
+
+function undoLastShot() {
+  const h = currentHole();
+  if (!h.shots.length) { showToast('취소할 샷이 없습니다'); return; }
+  h.shots.pop();
+  renderOverlays();
+  showToast('마지막 샷이 취소됐습니다');
+}
+
+function useGPS() {
+  if (!navigator.geolocation) { showToast('GPS를 사용할 수 없습니다','error'); return; }
+  showToast('GPS 위치 확인 중...');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const ll = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+    state.tempLatLng = ll;
+    openShotModal(ll);
+  }, () => showToast('GPS 권한을 허용해 주세요','error'));
+}
+
+function renderOverlays() {
+  shotOverlays.forEach(o=>o.setMap(null)); shotLines.forEach(l=>l.setMap(null)); distOverlays.forEach(o=>o.setMap(null));
+  if (pinOverlay) pinOverlay.setMap(null);
+  shotOverlays=[]; shotLines=[]; distOverlays=[];
+  const h = currentHole();
+
+  if (h.pin) {
+    pinOverlay = new kakao.maps.CustomOverlay({position:h.pin,content:'<div style="font-size:28px;filter:drop-shadow(0 2px 6px black);cursor:default;margin-bottom:-4px">🚩</div>',yAnchor:1.0,zIndex:5});
+    pinOverlay.setMap(kMap);
+  }
+
+  for (let i=1;i<h.shots.length;i++) {
+    const p=h.shots[i-1], c=h.shots[i];
+    const line = new kakao.maps.Polyline({path:[p.latlng,c.latlng],strokeWeight:2,strokeColor:'#ffffff',strokeOpacity:0.5,strokeStyle:'shortdash'});
+    line.setMap(kMap); shotLines.push(line);
+    const dist = haversine(p.latlng.getLat(),p.latlng.getLng(),c.latlng.getLat(),c.latlng.getLng());
+    const midLL = new kakao.maps.LatLng((p.latlng.getLat()+c.latlng.getLat())/2,(p.latlng.getLng()+c.latlng.getLng())/2);
+    const badge = new kakao.maps.CustomOverlay({position:midLL,content:`<div style="background:rgba(0,0,0,0.75);color:#a8dadc;font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;pointer-events:none">${dist}Y</div>`,zIndex:4});
+    badge.setMap(kMap); distOverlays.push(badge);
+  }
+
+  h.shots.forEach((shot,i) => {
+    const color = CLUB_COLORS[shot.club]||'#2d6a4f';
+    const content = `<div class="kakao-shot-marker" style="background:${color}" onclick="showShotInfo(${shot.id})">${i+1}<span class="club-label">${shot.club}</span></div>`;
+    const ov = new kakao.maps.CustomOverlay({position:shot.latlng,content,yAnchor:0.5,zIndex:10});
+    ov.setMap(kMap); shotOverlays.push(ov);
+  });
+}
+
+function showShotInfo(id) {
+  closeInfoOverlay();
+  const shot = currentHole().shots.find(s=>s.id===id);
+  if (!shot) return;
+  const club = CLUBS.find(c=>c.id===shot.club);
+  const content = `<div class="shot-info-popup"><div class="sip-club">${club?.emoji} ${club?.label}</div><div class="sip-dist">${shot.distToPin!==null?`핀까지 ${shot.distToPin}Y`:'핀 거리 미측정'}</div>${shot.note?`<div class="sip-note">${shot.note}</div>`:''}<div class="sip-num">${shot.num}번째 샷</div><div class="sip-actions"><button class="sip-btn del" onclick="deleteShot(${id})">🗑 삭제</button><button class="sip-btn" onclick="closeInfoOverlay()">닫기</button></div></div>`;
+  infoOverlay = new kakao.maps.CustomOverlay({position:shot.latlng,content,yAnchor:1.15,zIndex:20});
+  infoOverlay.setMap(kMap);
+}
+function closeInfoOverlay() { if(infoOverlay){infoOverlay.setMap(null);infoOverlay=null;} }
+
+function deleteShot(id) {
+  const h=currentHole(); h.shots=h.shots.filter(s=>s.id!==id); h.shots.forEach((s,i)=>s.num=i+1);
+  closeInfoOverlay(); renderOverlays(); buildScorecard(); showToast('샷이 삭제됐습니다');
+}
+
+function changeHole(d) { state.currentHole=Math.max(1,Math.min(18,state.currentHole+d)); closeInfoOverlay(); renderOverlays(); updateHoleDisplay(); buildScorecard(); }
+function goToHole(n) { state.currentHole=n; closeInfoOverlay(); renderOverlays(); updateHoleDisplay(); buildScorecard(); }
+function currentHole() { return state.holes[state.currentHole-1]; }
+function updateHoleDisplay() {
+  const h=currentHole();
+  document.getElementById('holeNum').textContent=`홀 ${h.num}`;
+  document.getElementById('holePar').textContent=`PAR ${h.par} · ${h.distance}Y`;
+  document.querySelectorAll('.hole-cell').forEach((el,i)=>el.classList.toggle('active',i+1===state.currentHole));
+}
+
+function openParModal() {
+  const h=currentHole(); state._tempPar=h.par;
+  document.getElementById('parModalSubtitle').textContent=`홀 ${h.num} 파 및 거리`;
+  document.getElementById('holeDistance').value=h.distance;
+  document.querySelectorAll('.par-opt').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('.par-opt')[h.par-3].classList.add('selected');
+  openModal('parModal');
+}
+function selectPar(p,el) { state._tempPar=p; document.querySelectorAll('.par-opt').forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); }
+function savePar() {
+  const h=currentHole(); h.par=state._tempPar;
+  const d=parseInt(document.getElementById('holeDistance').value); if(d>0) h.distance=d;
+  closeModal('parModal'); updateHoleDisplay(); buildScorecard(); showToast('홀 정보가 저장됐습니다');
+}
+
+function openScoreModal() {
+  const h=currentHole(); state.tempScore=h.score??h.par;
+  document.getElementById('scoreModalSubtitle').textContent=`홀 ${h.num} · Par ${h.par}`;
+  updateScoreDisplay(); openModal('scoreModal');
+}
+function adjustScore(d) { state.tempScore=Math.max(1,Math.min(12,state.tempScore+d)); updateScoreDisplay(); }
+function updateScoreDisplay() {
+  const diff=state.tempScore-currentHole().par;
+  document.getElementById('scoreDisplay').textContent=state.tempScore;
+  const labels={'-3':'알바트로스 -3','-2':'이글 -2','-1':'버디 -1','0':'파','1':'보기 +1','2':'더블보기 +2','3':'트리플+ +3'};
+  const colors={'-3':'#4ade80','-2':'#4ade80','-1':'#86efac','0':'var(--white)','1':'#fbbf24','2':'#e63946','3':'#f87171'};
+  const k=Math.max(-3,Math.min(3,diff)).toString();
+  document.getElementById('scoreVsPar').textContent=labels[k]||(diff>0?`+${diff}`:diff);
+  document.getElementById('scoreVsPar').style.color=colors[k]||'#f87171';
+}
+function saveScore() {
+  currentHole().score=state.tempScore; closeModal('scoreModal');
+  buildScorecard(); updateTotals(); showToast(`✅ 홀 ${state.currentHole} · ${state.tempScore}타`);
+}
+
+function buildClubGrid() {
+  document.getElementById('clubGrid').innerHTML=CLUBS.map(c=>`<button class="club-btn ${c.id===state.selectedClub?'selected':''}" onclick="selectClub('${c.id}')" data-club="${c.id}"><span class="club-emoji">${c.emoji}</span><span>${c.id}</span></button>`).join('');
+}
+function selectClub(id) { state.selectedClub=id; document.querySelectorAll('.club-btn').forEach(b=>b.classList.remove('selected')); document.querySelector(`[data-club="${id}"]`)?.classList.add('selected'); }
+
+function buildScorecard() {
+  ['holesRow','holesRow2'].forEach((rowId,ri)=>{
+    let html='';
+    for(let i=ri*9;i<(ri+1)*9;i++){
+      const h=state.holes[i]; if(!h) continue;
+      const diff=h.score!==null?h.score-h.par:null;
+      const cls=diff===null?'':diff<=-2?'eagle':diff===-1?'birdie':diff===0?'par':diff===1?'bogey':diff===2?'double':'triple-plus';
+      html+=`<div class="hole-cell ${i+1===state.currentHole?'active':''}" onclick="goToHole(${i+1})"><div class="hc-num">${i+1}</div><div class="hc-par">P${h.par}</div><div class="hc-score ${cls}">${h.score??''}</div></div>`;
+    }
+    document.getElementById(rowId).innerHTML=html;
+  });
+  updateTotals();
+}
+function updateTotals() {
+  const played=state.holes.filter(h=>h.score!==null);
+  if(!played.length){document.getElementById('totalScore').textContent='—';return;}
+  const total=played.reduce((s,h)=>s+h.score,0), par=played.reduce((s,h)=>s+h.par,0), diff=total-par;
+  document.getElementById('totalScore').textContent=total;
+  const b=document.getElementById('vsParBadge');
+  b.textContent=diff===0?'E':diff>0?`+${diff}`:diff;
+  b.className=`vs-par ${diff>0?'over':diff<0?'under':'even'}`;
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');if(id==='shotModal')state.tempLatLng=null;}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeModal(o.id);}));
+
+let toastTimer;
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=type==='error'?'#e63946':'#2d6a4f';
+  t.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>

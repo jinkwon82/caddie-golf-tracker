@@ -177,7 +177,10 @@
   <div class="header-actions">
     <button class="btn-icon" onclick="openParModal()" title="파/거리 설정">⛳</button>
     <button class="btn-icon" onclick="openScoreModal()" title="스코어 입력">📝</button>
+    <button class="btn-icon" onclick="saveRound()" title="라운드 저장">💾</button>
+    <button class="btn-icon" onclick="document.getElementById('loadInput').click()" title="라운드 불러오기">📂</button>
     <button class="btn-icon active" id="btnSat" onclick="toggleSatellite()" title="지도 모드 전환">🛰</button>
+    <input type="file" id="loadInput" accept=".json" style="display:none" onchange="loadRound(event)">
   </div>
 </header>
 
@@ -667,6 +670,79 @@ function resetNorth() {
   document.getElementById('compassBtn').classList.add('north-aligned');
   setTimeout(() => document.getElementById('compassBtn').classList.remove('north-aligned'), 1500);
   showToast('🧭 북쪽 기준으로 리셋됐습니다');
+}
+
+// ── 라운드 저장/불러오기 ──
+function saveRound() {
+  // latlng 객체는 JSON으로 직렬화가 안되므로 lat/lng 숫자로 변환
+  const data = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    holes: state.holes.map(h => ({
+      ...h,
+      pin: h.pin ? { lat: h.pin.getLat(), lng: h.pin.getLng() } : null,
+      shots: h.shots.map(s => ({
+        ...s,
+        latlng: { lat: s.latlng.getLat(), lng: s.latlng.getLng() }
+      }))
+    }))
+  };
+
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  // 파일명: caddie_2026-03-01.json 형식
+  const date = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `caddie_${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showToast('💾 라운드가 저장됐습니다');
+}
+
+function loadRound(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (!data.version || !data.holes) {
+        showToast('올바른 라운드 파일이 아닙니다', 'error');
+        return;
+      }
+
+      // lat/lng 숫자를 다시 kakao.maps.LatLng 객체로 복원
+      state.holes = data.holes.map(h => ({
+        ...h,
+        pin: h.pin ? new kakao.maps.LatLng(h.pin.lat, h.pin.lng) : null,
+        shots: h.shots.map(s => ({
+          ...s,
+          latlng: new kakao.maps.LatLng(s.latlng.lat, s.latlng.lng)
+        }))
+      }));
+
+      state.currentHole = 1;
+      closeInfoOverlay();
+      renderOverlays();
+      updateHoleDisplay();
+      buildScorecard();
+
+      const date = data.savedAt ? new Date(data.savedAt).toLocaleDateString('ko-KR') : '';
+      showToast(`📂 ${date} 라운드를 불러왔습니다`);
+    } catch(err) {
+      showToast('파일을 읽는 중 오류가 발생했습니다', 'error');
+    }
+  };
+  reader.readAsText(file);
+
+  // 같은 파일 재선택 가능하도록 초기화
+  event.target.value = '';
 }
 
 let toastTimer;

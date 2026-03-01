@@ -216,6 +216,45 @@
   .club-popup-cancel { width:100%; margin-top:8px; padding:8px; background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted); font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
   .club-popup-cancel:hover { border-color:var(--flag); color:var(--flag); }
 
+  /* 홀 설정 팝업 */
+  .hole-setup-popup {
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    z-index:200; display:flex; align-items:flex-end; justify-content:center;
+    backdrop-filter:blur(4px); opacity:0; pointer-events:none; transition:opacity 0.3s;
+  }
+  .hole-setup-popup.open { opacity:1; pointer-events:all; }
+  .hole-setup-sheet {
+    background:var(--rough); border:1px solid var(--border);
+    border-radius:20px 20px 0 0; width:100%; max-width:480px; padding:20px;
+    transform:translateY(100%); transition:transform 0.35s cubic-bezier(0.16,1,0.3,1);
+  }
+  .hole-setup-popup.open .hole-setup-sheet { transform:translateY(0); }
+  .hsp-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+  .hsp-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--gold); margin-bottom:4px; }
+  .hsp-subtitle { font-size:12px; color:var(--muted); margin-bottom:18px; }
+  .hsp-section { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:2px; margin-bottom:10px; }
+  .hsp-par-row { display:flex; gap:10px; margin-bottom:18px; }
+  .hsp-par-btn {
+    flex:1; padding:14px 4px; background:rgba(255,255,255,0.05);
+    border:1px solid var(--border); border-radius:12px; text-align:center;
+    cursor:pointer; transition:all 0.2s;
+  }
+  .hsp-par-btn:hover, .hsp-par-btn.selected { background:var(--green); border-color:var(--green); }
+  .hsp-par-btn .par-num { font-family:'DM Serif Display',serif; font-size:26px; color:var(--gold); display:block; }
+  .hsp-par-btn .par-label { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; display:block; margin-top:2px; }
+  .hsp-loc-row { display:flex; gap:10px; margin-bottom:18px; }
+  .hsp-loc-btn {
+    flex:1; padding:12px 8px; background:rgba(255,255,255,0.05);
+    border:1px solid var(--border); border-radius:12px; text-align:center;
+    cursor:pointer; transition:all 0.2s; font-size:13px; color:var(--white);
+    font-family:'Noto Sans KR',sans-serif;
+  }
+  .hsp-loc-btn:hover { background:var(--fairway); }
+  .hsp-loc-btn.set { border-color:var(--green); color:#4ade80; }
+  .hsp-loc-btn .loc-icon { font-size:20px; display:block; margin-bottom:4px; }
+  .hsp-dist { text-align:center; font-family:'DM Mono',monospace; font-size:13px; color:#4ade80; margin-bottom:16px; min-height:20px; }
+  .hsp-close { width:100%; padding:14px; background:var(--green); border:none; border-radius:12px; color:white; font-size:14px; font-weight:700; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+
   /* API 키 오류 안내 */
   .api-error { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--rough); z-index:50; }
   .api-error h2 { font-family:'DM Serif Display',serif; color:var(--gold); font-size:22px; }
@@ -236,8 +275,6 @@
     <button onclick="changeHole(1)">›</button>
   </div>
   <div class="header-actions">
-    <button class="btn-icon" onclick="openParModal()" title="파/거리 설정">⛳</button>
-    <button class="btn-icon" onclick="openScoreModal()" title="스코어 입력">📝</button>
     <button class="btn-icon" onclick="saveRound()" title="라운드 저장">💾</button>
     <button class="btn-icon" onclick="document.getElementById('loadInput').click()" title="라운드 불러오기">📂</button>
     <button class="btn-icon active" id="btnSat" onclick="toggleSatellite()" title="지도 모드 전환">🛰</button>
@@ -295,9 +332,8 @@
     <div class="shot-btn-label" id="shotBtnLabel">탭해서 샷 기록</div>
   </div>
 
-  <!-- 핀 설정 FAB (우측 하단으로 이동) -->
+  <!-- FAB 그룹 -->
   <div class="fab-group">
-    <button class="fab fab-flag" id="fabPin" onclick="togglePinMode()" title="홀컵 위치 설정">🏳</button>
     <button class="fab fab-secondary" onclick="undoLastShot()" title="마지막 샷 취소">↩</button>
   </div>
 </div>
@@ -342,22 +378,32 @@
   </div>
 </div>
 
-<!-- SCORE MODAL -->
-<div class="modal-overlay" id="scoreModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">스코어 입력</div>
-    <div class="modal-subtitle" id="scoreModalSubtitle">홀 1 · Par 4</div>
-    <div class="score-input-row">
-      <button class="score-btn" onclick="adjustScore(-1)">−</button>
-      <div class="score-num" id="scoreDisplay">4</div>
-      <button class="score-btn" onclick="adjustScore(1)">+</button>
+<!-- 홀 설정 팝업 -->
+<div class="hole-setup-popup" id="holeSetupPopup">
+  <div class="hole-setup-sheet">
+    <div class="hsp-handle"></div>
+    <div class="hsp-title" id="hspTitle">홀 1 설정</div>
+    <div class="hsp-subtitle" id="hspSubtitle">파 선택 및 위치 설정</div>
+
+    <div class="hsp-section">PAR</div>
+    <div class="hsp-par-row">
+      <div class="hsp-par-btn" onclick="hspSelectPar(3,this)"><span class="par-num">3</span><span class="par-label">PAR 3</span></div>
+      <div class="hsp-par-btn selected" id="hspPar4" onclick="hspSelectPar(4,this)"><span class="par-num">4</span><span class="par-label">PAR 4</span></div>
+      <div class="hsp-par-btn" onclick="hspSelectPar(5,this)"><span class="par-num">5</span><span class="par-label">PAR 5</span></div>
     </div>
-    <div class="score-vs-par" id="scoreVsPar">파</div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal('scoreModal')">취소</button>
-      <button class="btn-primary" onclick="saveScore()">저장</button>
+
+    <div class="hsp-section">위치 설정</div>
+    <div class="hsp-loc-row">
+      <button class="hsp-loc-btn" id="hspTeeBtn" onclick="hspSetTee()">
+        <span class="loc-icon">🏌</span>티샷 위치
+      </button>
+      <button class="hsp-loc-btn" id="hspCupBtn" onclick="hspSetCup()">
+        <span class="loc-icon">🏳</span>홀컵 위치
+      </button>
     </div>
+    <div class="hsp-dist" id="hspDist"></div>
+
+    <button class="hsp-close" onclick="closeHoleSetup()">완료</button>
   </div>
 </div>
 
@@ -409,7 +455,7 @@ const CLUB_COLORS = {
 // ── STATE ──
 const state = {
   currentHole: 1,
-  holes: Array.from({length:18},(_,i)=>({num:i+1,par:4,distance:380,score:null,shots:[],pin:null})),
+  holes: Array.from({length:18},(_,i)=>({num:i+1,par:4,distance:380,score:null,shots:[],pin:null,tee:null})),
   selectedClub: 'D',
   pinMode: false,
   tempLatLng: null,
@@ -439,10 +485,7 @@ function initMap() {
 
   kakao.maps.event.addListener(kMap, 'click', function(me) {
     closeInfoOverlay();
-    const ll = me.latLng;
-    if (state.pinMode) { setPinLatLng(ll); return; }
-    // 새 샷 플로우
-    handleMapClickForShot(ll);
+    handleMapClickForShot(me.latLng);
   });
 
   if (navigator.geolocation) {
@@ -554,8 +597,32 @@ function hideStepBadge() {
   document.getElementById('shotStepBadge').classList.remove('visible');
 }
 
-// 지도 클릭 처리 (기존 kakao click 이벤트에서 호출)
+// 지도 클릭 처리
 function handleMapClickForShot(ll) {
+  // 홀 설정 모드 (티샷/홀컵 위치)
+  if (hspMode === 'tee') {
+    state.holes[hspTargetHole - 1].tee = ll;
+    hspMode = null;
+    hideStepBadge();
+    updateHspDist();
+    renderOverlays();
+    showToast('🏌 티샷 위치 저장됨');
+    openHoleSetup(hspTargetHole);
+    return;
+  }
+  if (hspMode === 'cup') {
+    state.holes[hspTargetHole - 1].pin = ll;
+    hspMode = null;
+    hideStepBadge();
+    updateHspDist();
+    renderOverlays();
+    showToast('🏳 홀컵 위치 저장됨');
+    openHoleSetup(hspTargetHole);
+    return;
+  }
+  // 기존 핀 설정 모드
+  if (state.pinMode) { setPinLatLng(ll); return; }
+  // 샷 입력 플로우
   if (shotFlow.step === 'start') {
     placeStartPin(ll);
   } else if (shotFlow.step === 'end') {
@@ -658,13 +725,18 @@ function commitShot(dist) {
     num: h.shots.length + 1
   });
 
+  // 스코어 자동 +1
+  const h2 = currentHole();
+  h2.score = (h2.score ?? 0) + 1;
+
   // 임시 마커/라인 정리
   clearShotFlowOverlays();
   resetShotFlow();
 
   renderOverlays();
   buildScorecard();
-  showToast(`⛳ ${shotFlow.club || state.selectedClub} ${dist}Y 기록 완료`);
+  const savedClub = shotFlow.club || state.selectedClub;
+  showToast(`⛳ ${savedClub} ${dist}Y · ${h2.score}타`);
 }
 
 function clearShotFlowOverlays() {
@@ -708,6 +780,10 @@ function renderOverlays() {
   if (h.pin) {
     pinOverlay = new kakao.maps.CustomOverlay({position:h.pin,content:'<div style="font-size:28px;filter:drop-shadow(0 2px 6px white);cursor:default;margin-bottom:-4px">🏳</div>',yAnchor:1.0,zIndex:5});
     pinOverlay.setMap(kMap);
+  }
+  if (h.tee) {
+    const teeOv = new kakao.maps.CustomOverlay({position:h.tee,content:'<div style="font-size:22px;filter:drop-shadow(0 2px 4px black);cursor:default;margin-bottom:-2px">🏌</div>',yAnchor:1.0,zIndex:5});
+    teeOv.setMap(kMap); shotOverlays.push(teeOv);
   }
 
   for (let i=1;i<h.shots.length;i++) {
@@ -781,39 +857,72 @@ function updateHoleDisplay() {
   document.querySelectorAll('.hole-cell').forEach((el,i)=>el.classList.toggle('active',i+1===state.currentHole));
 }
 
-function openParModal() {
-  const h=currentHole(); state._tempPar=h.par;
-  document.getElementById('parModalSubtitle').textContent=`홀 ${h.num} 파 및 거리`;
-  document.getElementById('holeDistance').value=h.distance;
-  document.querySelectorAll('.par-opt').forEach(el=>el.classList.remove('selected'));
-  document.querySelectorAll('.par-opt')[h.par-3].classList.add('selected');
-  openModal('parModal');
-}
-function selectPar(p,el) { state._tempPar=p; document.querySelectorAll('.par-opt').forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); }
-function savePar() {
-  const h=currentHole(); h.par=state._tempPar;
-  const d=parseInt(document.getElementById('holeDistance').value); if(d>0) h.distance=d;
-  closeModal('parModal'); updateHoleDisplay(); buildScorecard(); showToast('홀 정보가 저장됐습니다');
+// ── 홀 설정 팝업 ──
+let hspTargetHole = 1; // 현재 설정 중인 홀 번호
+let hspMode = null;    // 'tee' | 'cup' | null
+
+function openHoleSetup(holeNum) {
+  hspTargetHole = holeNum;
+  state.currentHole = holeNum;
+  const h = state.holes[holeNum - 1];
+
+  document.getElementById('hspTitle').textContent = `홀 ${holeNum} 설정`;
+  document.getElementById('hspSubtitle').textContent = `파 선택 및 위치 설정`;
+
+  // 파 버튼 초기화
+  document.querySelectorAll('.hsp-par-btn').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.hsp-par-btn')[h.par - 3].classList.add('selected');
+
+  // 위치 설정 버튼 상태
+  document.getElementById('hspTeeBtn').classList.toggle('set', !!h.tee);
+  document.getElementById('hspCupBtn').classList.toggle('set', !!h.pin);
+
+  updateHspDist();
+  renderOverlays();
+  updateHoleDisplay();
+  buildScorecard();
+  document.getElementById('holeSetupPopup').classList.add('open');
 }
 
-function openScoreModal() {
-  const h=currentHole(); state.tempScore=h.score??h.par;
-  document.getElementById('scoreModalSubtitle').textContent=`홀 ${h.num} · Par ${h.par}`;
-  updateScoreDisplay(); openModal('scoreModal');
+function closeHoleSetup() {
+  document.getElementById('holeSetupPopup').classList.remove('open');
+  hspMode = null;
+  updateHoleDisplay();
+  buildScorecard();
 }
-function adjustScore(d) { state.tempScore=Math.max(1,Math.min(12,state.tempScore+d)); updateScoreDisplay(); }
-function updateScoreDisplay() {
-  const diff=state.tempScore-currentHole().par;
-  document.getElementById('scoreDisplay').textContent=state.tempScore;
-  const labels={'-3':'알바트로스 -3','-2':'이글 -2','-1':'버디 -1','0':'파','1':'보기 +1','2':'더블보기 +2','3':'트리플+ +3'};
-  const colors={'-3':'#4ade80','-2':'#4ade80','-1':'#86efac','0':'var(--white)','1':'#fbbf24','2':'#e63946','3':'#f87171'};
-  const k=Math.max(-3,Math.min(3,diff)).toString();
-  document.getElementById('scoreVsPar').textContent=labels[k]||(diff>0?`+${diff}`:diff);
-  document.getElementById('scoreVsPar').style.color=colors[k]||'#f87171';
+
+function hspSelectPar(p, el) {
+  state.holes[hspTargetHole - 1].par = p;
+  document.querySelectorAll('.hsp-par-btn').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  updateHspDist();
 }
-function saveScore() {
-  currentHole().score=state.tempScore; closeModal('scoreModal');
-  buildScorecard(); updateTotals(); showToast(`✅ 홀 ${state.currentHole} · ${state.tempScore}타`);
+
+function hspSetTee() {
+  hspMode = 'tee';
+  document.getElementById('holeSetupPopup').classList.remove('open');
+  showStepBadge('step-start', '🏌 티샷 위치를 지도에서 탭하세요');
+  showToast('티샷 위치를 지도에서 탭하세요');
+}
+
+function hspSetCup() {
+  hspMode = 'cup';
+  document.getElementById('holeSetupPopup').classList.remove('open');
+  showStepBadge('step-end', '🏳 홀컵 위치를 지도에서 탭하세요');
+  showToast('홀컵 위치를 지도에서 탭하세요');
+}
+
+function updateHspDist() {
+  const h = state.holes[hspTargetHole - 1];
+  const el = document.getElementById('hspDist');
+  if (h.tee && h.pin) {
+    const d = haversine(h.tee.getLat(), h.tee.getLng(), h.pin.getLat(), h.pin.getLng());
+    h.distance = d;
+    el.textContent = `홀 거리: ${d}Y`;
+  } else {
+    el.textContent = h.tee ? '홀컵 위치를 설정하면 거리가 자동 계산됩니다' : '티샷과 홀컵 위치를 설정해 주세요';
+    el.style.color = 'var(--muted)';
+  }
 }
 
 function buildClubGrid() {
@@ -830,7 +939,7 @@ function buildScorecard() {
       const h=state.holes[i]; if(!h) continue;
       const diff=h.score!==null?h.score-h.par:null;
       const cls=diff===null?'':diff<=-2?'eagle':diff===-1?'birdie':diff===0?'par':diff===1?'bogey':diff===2?'double':'triple-plus';
-      html+=`<div class="hole-cell ${i+1===state.currentHole?'active':''}" onclick="goToHole(${i+1})"><div class="hc-num">${i+1}</div><div class="hc-par">P${h.par}</div><div class="hc-score ${cls}">${h.score??''}</div></div>`;
+      html+=`<div class="hole-cell ${i+1===state.currentHole?'active':''}" onclick="openHoleSetup(${i+1})"><div class="hc-num">${i+1}</div><div class="hc-par">P${h.par}</div><div class="hc-score ${cls}">${h.score??''}</div></div>`;
     }
     document.getElementById(rowId).innerHTML=html;
   });
@@ -920,6 +1029,7 @@ function saveRound() {
     holes: state.holes.map(h => ({
       ...h,
       pin: h.pin ? { lat: h.pin.getLat(), lng: h.pin.getLng() } : null,
+      tee: h.tee ? { lat: h.tee.getLat(), lng: h.tee.getLng() } : null,
       shots: h.shots.map(s => ({
         ...s,
         latlng: { lat: s.latlng.getLat(), lng: s.latlng.getLng() },
@@ -961,6 +1071,7 @@ function loadRound(event) {
       state.holes = data.holes.map(h => ({
         ...h,
         pin: h.pin ? new kakao.maps.LatLng(h.pin.lat, h.pin.lng) : null,
+          tee: h.tee ? new kakao.maps.LatLng(h.tee.lat, h.tee.lng) : null,
         shots: h.shots.map(s => ({
           ...s,
           latlng: new kakao.maps.LatLng(s.latlng.lat, s.latlng.lng),

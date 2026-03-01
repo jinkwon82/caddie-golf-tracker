@@ -155,6 +155,67 @@
   .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--green); color:white; padding:8px 18px; border-radius:20px; font-size:13px; z-index:300; opacity:0; transition:all 0.3s; pointer-events:none; white-space:nowrap; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
+  /* SHOT 버튼 */
+  .shot-btn-wrap { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); z-index:30; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .shot-btn {
+    width:72px; height:72px; border-radius:50%; border:none; cursor:pointer;
+    background: conic-gradient(var(--flag) 0%, #ff6b6b 100%);
+    color:white; font-family:'DM Serif Display',serif; font-size:15px; letter-spacing:1px;
+    box-shadow: 0 4px 20px rgba(230,57,70,0.6), 0 0 0 4px rgba(230,57,70,0.2);
+    transition:all 0.2s; display:flex; align-items:center; justify-content:center;
+  }
+  .shot-btn:active { transform:scale(0.92); }
+  .shot-btn.inactive {
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    color: var(--muted);
+    cursor: default;
+  }
+  .shot-btn-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; }
+
+  /* 샷 입력 단계 안내 배지 */
+  .shot-step-badge {
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    padding:7px 16px; border-radius:20px; font-size:12px;
+    font-family:'DM Mono',monospace; white-space:nowrap; z-index:20;
+    display:none; pointer-events:none;
+  }
+  .shot-step-badge.visible { display:block; }
+  .shot-step-badge.step-start { background:rgba(230,57,70,0.15); border:1px solid var(--flag); color:var(--flag); }
+  .shot-step-badge.step-club  { background:rgba(198,168,76,0.15); border:1px solid var(--gold); color:var(--gold); }
+  .shot-step-badge.step-end   { background:rgba(74,174,220,0.15); border:1px solid #4aaedc; color:#4aaedc; }
+
+  /* 실시간 거리 오버레이 */
+  .dist-live-badge {
+    background:rgba(0,0,0,0.8); color:#4ade80;
+    font-family:'DM Mono',monospace; font-size:13px; font-weight:500;
+    padding:4px 10px; border-radius:6px; pointer-events:none;
+    white-space:nowrap; border:1px solid rgba(74,222,128,0.3);
+  }
+
+  /* 클럽 선택 팝업 (지도 위 하단) */
+  .club-popup {
+    position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+    background:var(--rough); border:1px solid var(--border); border-radius:16px;
+    padding:14px; z-index:100; width:min(340px, 92vw);
+    box-shadow:0 8px 32px rgba(0,0,0,0.6);
+    display:none;
+  }
+  .club-popup.visible { display:block; }
+  .club-popup-title { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:2px; margin-bottom:10px; text-align:center; }
+  .club-popup-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .club-popup-btn {
+    padding:8px 4px; background:rgba(255,255,255,0.05);
+    border:1px solid var(--border); border-radius:8px;
+    color:var(--white); font-family:'DM Mono',monospace; font-size:11px;
+    cursor:pointer; transition:all 0.15s; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .club-popup-btn span:first-child { font-size:14px; }
+  .club-popup-btn:hover, .club-popup-btn.selected { background:var(--green); border-color:var(--green); color:white; }
+  .club-popup-cancel { width:100%; margin-top:8px; padding:8px; background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted); font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .club-popup-cancel:hover { border-color:var(--flag); color:var(--flag); }
+
   /* API 키 오류 안내 */
   .api-error { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--rough); z-index:50; }
   .api-error h2 { font-family:'DM Serif Display',serif; color:var(--gold); font-size:22px; }
@@ -218,9 +279,25 @@
     <div class="gps-dot"></div>
     <span id="gpsText">GPS 확인중</span>
   </div>
+  <!-- 샷 입력 단계 안내 -->
+  <div class="shot-step-badge" id="shotStepBadge"></div>
+
+  <!-- 클럽 선택 팝업 -->
+  <div class="club-popup" id="clubPopup">
+    <div class="club-popup-title">CLUB SELECT</div>
+    <div class="club-popup-grid" id="clubPopupGrid"></div>
+    <button class="club-popup-cancel" onclick="cancelShot()">취소</button>
+  </div>
+
+  <!-- SHOT 버튼 + 실행 취소 -->
+  <div class="shot-btn-wrap">
+    <button class="shot-btn" id="shotBtn" onclick="onShotBtn()">SHOT</button>
+    <div class="shot-btn-label" id="shotBtnLabel">탭해서 샷 기록</div>
+  </div>
+
+  <!-- 핀 설정 FAB (우측 하단으로 이동) -->
   <div class="fab-group">
     <button class="fab fab-flag" id="fabPin" onclick="togglePinMode()" title="핀 위치 설정">📍</button>
-    <button class="fab fab-primary" onclick="useGPS()" title="현재 위치에서 샷 기록">🎯</button>
     <button class="fab fab-secondary" onclick="undoLastShot()" title="마지막 샷 취소">↩</button>
   </div>
 </div>
@@ -238,27 +315,7 @@
   <div class="holes-row" id="holesRow2"></div>
 </div>
 
-<!-- SHOT MODAL -->
-<div class="modal-overlay" id="shotModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">샷 기록</div>
-    <div class="modal-subtitle" id="shotModalSubtitle">홀 1 · 1번째 샷</div>
-    <div class="club-grid" id="clubGrid"></div>
-    <div class="modal-row">
-      <label>핀까지 거리</label>
-      <div class="dist-display" id="distToPin">— Y</div>
-    </div>
-    <div class="modal-row">
-      <label>메모</label>
-      <input class="modal-input" id="shotNote" placeholder="훅, 뒤땅, 멀리건..." />
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal('shotModal')">취소</button>
-      <button class="btn-primary" onclick="saveShot()">기록 저장</button>
-    </div>
-  </div>
-</div>
+<!-- SHOT MODAL 제거됨: 새 플로우로 대체 -->
 
 <!-- PAR MODAL -->
 <div class="modal-overlay" id="parModal">
@@ -366,7 +423,6 @@ let shotOverlays=[], pinOverlay=null, shotLines=[], distOverlays=[], infoOverlay
 
 // ── INIT ──
 function initApp() {
-  buildClubGrid();
   buildScorecard();
   updateHoleDisplay();
   initMap();
@@ -385,8 +441,8 @@ function initMap() {
     closeInfoOverlay();
     const ll = me.latLng;
     if (state.pinMode) { setPinLatLng(ll); return; }
-    state.tempLatLng = ll;
-    openShotModal(ll);
+    // 새 샷 플로우
+    handleMapClickForShot(ll);
   });
 
   if (navigator.geolocation) {
@@ -451,24 +507,187 @@ function distToPin(ll) {
   return haversine(ll.getLat(),ll.getLng(),pin.getLat(),pin.getLng());
 }
 
-function openShotModal(ll) {
-  const h = currentHole();
-  document.getElementById('shotModalSubtitle').textContent = `홀 ${h.num} · ${h.shots.length+1}번째 샷`;
-  const d = distToPin(ll);
-  document.getElementById('distToPin').textContent = d!==null ? `${d} Y` : '— Y  (핀을 먼저 설정하세요)';
-  document.getElementById('shotNote').value = '';
-  openModal('shotModal');
+// ── 새 샷 입력 플로우 ──
+// step: 'idle' | 'start' | 'club' | 'end'
+let shotFlow = {
+  step: 'idle',
+  startLL: null,
+  endLL: null,
+  club: null,
+  startMarker: null,  // 빨간 드래그 마커
+  endMarker: null,    // 파란 드래그 마커
+  distLine: null,     // 실시간 라인
+  distOverlay: null,  // 실시간 거리 배지
+};
+
+function onShotBtn() {
+  if (shotFlow.step !== 'idle') return;
+  startShotFlow();
 }
 
-function saveShot() {
-  if (!state.tempLatLng) return;
+function startShotFlow() {
+  shotFlow.step = 'start';
+  setShotBtnInactive();
+  showStepBadge('step-start', '🔴 시작 위치를 지도에서 탭하세요');
+  showToast('빨간 핀: 샷 시작 위치를 탭하세요');
+}
+
+function setShotBtnActive() {
+  const btn = document.getElementById('shotBtn');
+  btn.classList.remove('inactive');
+  document.getElementById('shotBtnLabel').textContent = '탭해서 샷 기록';
+}
+
+function setShotBtnInactive() {
+  const btn = document.getElementById('shotBtn');
+  btn.classList.add('inactive');
+  document.getElementById('shotBtnLabel').textContent = '입력 중...';
+}
+
+function showStepBadge(cls, text) {
+  const el = document.getElementById('shotStepBadge');
+  el.className = `shot-step-badge visible ${cls}`;
+  el.textContent = text;
+}
+
+function hideStepBadge() {
+  document.getElementById('shotStepBadge').classList.remove('visible');
+}
+
+// 지도 클릭 처리 (기존 kakao click 이벤트에서 호출)
+function handleMapClickForShot(ll) {
+  if (shotFlow.step === 'start') {
+    placeStartPin(ll);
+  } else if (shotFlow.step === 'end') {
+    placeEndPin(ll);
+  }
+}
+
+function placeStartPin(ll) {
+  // 기존 시작 마커 제거
+  if (shotFlow.startMarker) shotFlow.startMarker.setMap(null);
+
+  // 빨간 드래그 마커 생성
+  const content = `<div style="font-size:30px;cursor:grab;filter:drop-shadow(0 2px 6px black);margin-bottom:-4px;user-select:none">📍</div>`;
+  shotFlow.startLL = ll;
+  shotFlow.startMarker = new kakao.maps.CustomOverlay({
+    position: ll, content, yAnchor: 1.0, zIndex: 15
+  });
+  shotFlow.startMarker.setMap(kMap);
+
+  // 클럽 선택 단계로
+  shotFlow.step = 'club';
+  showStepBadge('step-club', '🏌 사용한 클럽을 선택하세요');
+  showClubPopup();
+}
+
+function showClubPopup() {
+  const grid = document.getElementById('clubPopupGrid');
+  grid.innerHTML = CLUBS.map(c => `
+    <button class="club-popup-btn ${c.id === state.selectedClub ? 'selected' : ''}"
+            onclick="selectClubAndNext('${c.id}')">
+      <span>${c.emoji}</span><span>${c.id}</span>
+    </button>`).join('');
+  document.getElementById('clubPopup').classList.add('visible');
+}
+
+function selectClubAndNext(id) {
+  state.selectedClub = id;
+  shotFlow.club = id;
+  document.getElementById('clubPopup').classList.remove('visible');
+
+  // 종료 위치 입력 단계
+  shotFlow.step = 'end';
+  showStepBadge('step-end', '🔵 샷 종료 위치를 탭하세요');
+  showToast('파란 핀: 공이 떨어진 위치를 탭하세요');
+}
+
+function placeEndPin(ll) {
+  shotFlow.endLL = ll;
+
+  // 파란 마커
+  if (shotFlow.endMarker) shotFlow.endMarker.setMap(null);
+  const content = `<div style="font-size:30px;cursor:grab;filter:drop-shadow(0 2px 6px rgba(74,174,220,0.8));margin-bottom:-4px;user-select:none">🔵</div>`;
+  shotFlow.endMarker = new kakao.maps.CustomOverlay({
+    position: ll, content, yAnchor: 1.0, zIndex: 15
+  });
+  shotFlow.endMarker.setMap(kMap);
+
+  // 라인
+  if (shotFlow.distLine) shotFlow.distLine.setMap(null);
+  shotFlow.distLine = new kakao.maps.Polyline({
+    path: [shotFlow.startLL, ll],
+    strokeWeight: 2, strokeColor: '#4aaedc',
+    strokeOpacity: 0.8, strokeStyle: 'solid'
+  });
+  shotFlow.distLine.setMap(kMap);
+
+  // 거리 계산
+  const dist = haversine(
+    shotFlow.startLL.getLat(), shotFlow.startLL.getLng(),
+    ll.getLat(), ll.getLng()
+  );
+
+  // 중간 거리 배지
+  if (shotFlow.distOverlay) shotFlow.distOverlay.setMap(null);
+  const midLL = new kakao.maps.LatLng(
+    (shotFlow.startLL.getLat() + ll.getLat()) / 2,
+    (shotFlow.startLL.getLng() + ll.getLng()) / 2
+  );
+  shotFlow.distOverlay = new kakao.maps.CustomOverlay({
+    position: midLL,
+    content: `<div class="dist-live-badge">${dist}Y</div>`,
+    zIndex: 16
+  });
+  shotFlow.distOverlay.setMap(kMap);
+
+  // 샷 저장
+  commitShot(dist);
+}
+
+function commitShot(dist) {
   const h = currentHole();
-  h.shots.push({id:Date.now(),club:state.selectedClub,latlng:state.tempLatLng,distToPin:distToPin(state.tempLatLng),note:document.getElementById('shotNote').value,num:h.shots.length+1});
-  closeModal('shotModal');
-  state.tempLatLng = null;
+  h.shots.push({
+    id: Date.now(),
+    club: shotFlow.club,
+    latlng: shotFlow.startLL,   // 시작 위치를 샷 위치로 저장
+    endLatlng: shotFlow.endLL,  // 종료 위치
+    distShot: dist,             // 샷 거리
+    distToPin: distToPin(shotFlow.endLL), // 종료위치에서 핀까지
+    note: '',
+    num: h.shots.length + 1
+  });
+
+  // 임시 마커/라인 정리
+  clearShotFlowOverlays();
+  resetShotFlow();
+
   renderOverlays();
   buildScorecard();
-  showToast(`⛳ ${state.selectedClub} 샷 기록 완료`);
+  showToast(`⛳ ${shotFlow.club || state.selectedClub} ${dist}Y 기록 완료`);
+}
+
+function clearShotFlowOverlays() {
+  if (shotFlow.startMarker) { shotFlow.startMarker.setMap(null); shotFlow.startMarker = null; }
+  if (shotFlow.endMarker)   { shotFlow.endMarker.setMap(null);   shotFlow.endMarker = null; }
+  if (shotFlow.distLine)    { shotFlow.distLine.setMap(null);    shotFlow.distLine = null; }
+  if (shotFlow.distOverlay) { shotFlow.distOverlay.setMap(null); shotFlow.distOverlay = null; }
+}
+
+function resetShotFlow() {
+  shotFlow.step = 'idle';
+  shotFlow.startLL = null;
+  shotFlow.endLL = null;
+  shotFlow.club = null;
+  hideStepBadge();
+  setShotBtnActive();
+}
+
+function cancelShot() {
+  document.getElementById('clubPopup').classList.remove('visible');
+  clearShotFlowOverlays();
+  resetShotFlow();
+  showToast('샷 입력이 취소됐습니다');
 }
 
 function undoLastShot() {
@@ -476,17 +695,8 @@ function undoLastShot() {
   if (!h.shots.length) { showToast('취소할 샷이 없습니다'); return; }
   h.shots.pop();
   renderOverlays();
+  buildScorecard();
   showToast('마지막 샷이 취소됐습니다');
-}
-
-function useGPS() {
-  if (!navigator.geolocation) { showToast('GPS를 사용할 수 없습니다','error'); return; }
-  showToast('GPS 위치 확인 중...');
-  navigator.geolocation.getCurrentPosition(pos => {
-    const ll = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-    state.tempLatLng = ll;
-    openShotModal(ll);
-  }, () => showToast('GPS 권한을 허용해 주세요','error'));
 }
 
 function renderOverlays() {
@@ -512,9 +722,36 @@ function renderOverlays() {
 
   h.shots.forEach((shot,i) => {
     const color = CLUB_COLORS[shot.club]||'#2d6a4f';
-    const content = `<div class="kakao-shot-marker" style="background:${color}" onclick="showShotInfo(${shot.id})">${i+1}<span class="club-label">${shot.club}</span></div>`;
-    const ov = new kakao.maps.CustomOverlay({position:shot.latlng,content,yAnchor:0.5,zIndex:10});
-    ov.setMap(kMap); shotOverlays.push(ov);
+    // 시작 마커 (번호 + 클럽)
+    const startContent = `<div class="kakao-shot-marker" style="background:${color}" onclick="showShotInfo(${shot.id})">${i+1}<span class="club-label">${shot.club}</span></div>`;
+    const startOv = new kakao.maps.CustomOverlay({position:shot.latlng,content:startContent,yAnchor:0.5,zIndex:10});
+    startOv.setMap(kMap); shotOverlays.push(startOv);
+
+    // 종료 마커 (공 위치) + 라인
+    if (shot.endLatlng) {
+      const line = new kakao.maps.Polyline({
+        path:[shot.latlng, shot.endLatlng],
+        strokeWeight:2, strokeColor:color,
+        strokeOpacity:0.7, strokeStyle:'solid'
+      });
+      line.setMap(kMap); shotLines.push(line);
+
+      const endContent = `<div style="width:10px;height:10px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`;
+      const endOv = new kakao.maps.CustomOverlay({position:shot.endLatlng,content:endContent,yAnchor:0.5,zIndex:9});
+      endOv.setMap(kMap); shotOverlays.push(endOv);
+
+      // 샷 거리 배지
+      const midLL = new kakao.maps.LatLng(
+        (shot.latlng.getLat()+shot.endLatlng.getLat())/2,
+        (shot.latlng.getLng()+shot.endLatlng.getLng())/2
+      );
+      const distBadge = new kakao.maps.CustomOverlay({
+        position: midLL,
+        content: `<div style="background:rgba(0,0,0,0.75);color:${color};font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;pointer-events:none">${shot.distShot}Y</div>`,
+        zIndex:8
+      });
+      distBadge.setMap(kMap); distOverlays.push(distBadge);
+    }
   });
 }
 
@@ -580,7 +817,9 @@ function saveScore() {
 }
 
 function buildClubGrid() {
-  document.getElementById('clubGrid').innerHTML=CLUBS.map(c=>`<button class="club-btn ${c.id===state.selectedClub?'selected':''}" onclick="selectClub('${c.id}')" data-club="${c.id}"><span class="club-emoji">${c.emoji}</span><span>${c.id}</span></button>`).join('');
+  const el = document.getElementById('clubGrid');
+  if (!el) return;
+  el.innerHTML=CLUBS.map(c=>`<button class="club-btn ${c.id===state.selectedClub?'selected':''}" onclick="selectClub('${c.id}')" data-club="${c.id}"><span class="club-emoji">${c.emoji}</span><span>${c.id}</span></button>`).join('');
 }
 function selectClub(id) { state.selectedClub=id; document.querySelectorAll('.club-btn').forEach(b=>b.classList.remove('selected')); document.querySelector(`[data-club="${id}"]`)?.classList.add('selected'); }
 
@@ -683,7 +922,8 @@ function saveRound() {
       pin: h.pin ? { lat: h.pin.getLat(), lng: h.pin.getLng() } : null,
       shots: h.shots.map(s => ({
         ...s,
-        latlng: { lat: s.latlng.getLat(), lng: s.latlng.getLng() }
+        latlng: { lat: s.latlng.getLat(), lng: s.latlng.getLng() },
+        endLatlng: s.endLatlng ? { lat: s.endLatlng.getLat(), lng: s.endLatlng.getLng() } : null
       }))
     }))
   };
@@ -723,7 +963,8 @@ function loadRound(event) {
         pin: h.pin ? new kakao.maps.LatLng(h.pin.lat, h.pin.lng) : null,
         shots: h.shots.map(s => ({
           ...s,
-          latlng: new kakao.maps.LatLng(s.latlng.lat, s.latlng.lng)
+          latlng: new kakao.maps.LatLng(s.latlng.lat, s.latlng.lng),
+          endLatlng: s.endLatlng ? new kakao.maps.LatLng(s.endLatlng.lat, s.endLatlng.lng) : null
         }))
       }));
 
